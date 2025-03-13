@@ -1,8 +1,8 @@
-Year,President,Party,Main Opponent,Opponent Party,Electoral Vote Winner,Electoral Vote Opponent,Total Electoral Votes,Majority Needed,Vice President,V.P. Opponent,Notes
-2000,George W. Bush,R,"Albert Gore, Jr.",D,271,266,538,270,Richard B. Cheney,Joseph Lieberman,"George W. Bush received fewer popular votes than Albert Gore Jr., but received a majority of electoral votes. An elector from DC abstained."
-2004,George W. Bush,R,John F. Kerry,D,286,251,538,270,Richard B. Cheney,John Edwards,Objections raised to the Ohio Certificate of Vote; overridden by both houses.
-2008,Barack Obama,D,John McCain,R,365,173,538,270,Joe Biden,Sarah Palin,Nebraska's electoral votes were split for the first time.
-2012,Barack Obama,D,Mitt Romney,R,332,206,538,270,Joe Biden,Paul Ryan,No major controversies.
-2016,Donald J. Trump,R,Hillary Clinton,D,304,227,538,270,Michael R. Pence,Timothy Kaine,"Maine's electoral votes were split for the first time; faithless electors in Hawaii, Texas, and Washington."
-2020,Joseph R. Biden Jr.,D,Donald J. Trump,R,306,232,538,270,Kamala D. Harris,Michael R. Pence,"Both Maine and Nebraska split electoral votes; objections raised to Arizona and Pennsylvania votes, but not sustained."
-2024,Donald J. Trump,R,Kamala D. Harris,D,312,226,538,270,JD Vance,Tim Walz,"Both Maine and Nebraska split electoral votes; Maine's split for the third time, Nebraska's for the third time."
+Year,Party,Opponent Party,Electoral Vote Winner,Electoral Vote Opponent,Number of votes,Election date,Inaugration date,End of term,
+2000,R,D,271,266,"50,456,062",2000-11-07,2001-01-20,2005-01-20,
+2004,R,D,286,251,"62,040,610",2004-11-02,2005-01-20,2009-01-20,
+2008,D,R,365,173,"69,498,516",2008-11-04,2009-01-20,2013-01-21,
+2012,D,R,332,206,"65,915,795",2012-11-06,2013-01-21,2017-01-20,
+2016,R,D,304,227,"62,984,828",2016-11-08,2017-01-20,2021-01-20,
+2020,D,R,306,232,"81,268,867",2020-11-03,2021-01-20,2025-01-20,
+2024,R,D,312,226,"77,303,569",2024-11-05,2025-01-20,2029-01-20,
