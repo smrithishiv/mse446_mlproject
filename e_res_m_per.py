@@ -3,7 +3,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 
 # Election Data Organization
-stock_df = pd.read_csv("USA_Stock_Prices.csv")
+stock_df = pd.read_csv("data/USA_Stock_Prices.csv")
 
 stock_df["Date"] = pd.to_datetime(stock_df["Date"], errors="coerce", utc=True)
 stock_df["Date"] = stock_df["Date"].dt.tz_convert(None)
@@ -15,7 +15,7 @@ stock_df["Year"] = stock_df["Date"].dt.year
 
 
 # Stock Data Organization
-election_df = pd.read_csv("us_presidential_elections_2000_2024.csv")
+election_df = pd.read_csv("data/us_presidential_elections_2000_2024.csv")
 
 merged_df = stock_df.groupby("Year").agg(
     start_price=("Close", "first"),
