@@ -1,11 +1,7 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from sklearn.model_selection import train_test_split
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.metrics import mean_absolute_error
 from sklearn.preprocessing import MinMaxScaler
-from xgboost import XGBRegressor
 
 # Load datasets
 elections = pd.read_csv("data/us_presidential_elections_2000_2024.csv")
@@ -55,7 +51,7 @@ null_counts = merged_data.isnull().sum()[merged_data.isnull().sum() > 0]
 if null_counts.empty:
     print("No null values remain in merged_data!")
 else:
-    print("Null values still exist:", null_counts)
+    print("⚠Null values still exist:", null_counts)
 
 # Select features (Including election-related ones)
 features = ["Electoral_Vote_Winner", "Popular_Vote_Margin", "Election_Year_Inflation_Rate",
@@ -72,34 +68,3 @@ election_features = ["Electoral_Vote_Winner", "Popular_Vote_Margin", "Election_Y
                      "Percent voted"]
 
 merged_data[election_features] = scaler.fit_transform(merged_data[election_features])
-
-# Define input (X) and target variable (y)
-X = merged_data[features]
-y = merged_data["Close"]  # Predicting stock closing price
-
-# Train-Test Split
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-
-# Train XGBoost Model (Better for mixed features)
-xgb_model = XGBRegressor(n_estimators=100, learning_rate=0.1, random_state=42)
-xgb_model.fit(X_train, y_train)
-
-# Make predictions
-y_pred = xgb_model.predict(X_test)
-
-# Evaluate Model Performance
-mae = mean_absolute_error(y_test, y_pred)
-print(f"Mean Absolute Error (XGBoost): {mae:.2f}")
-
-# Feature Importance (After Scaling)
-importances = xgb_model.feature_importances_
-feature_names = X_train.columns
-indices = np.argsort(importances)[::-1]
-
-plt.figure(figsize=(10, 6))
-plt.barh([feature_names[i] for i in indices], importances[indices], color="skyblue")
-plt.xlabel("Importance Score")
-plt.ylabel("Feature")
-plt.title("Feature Importance in Stock Price Prediction (XGBoost)")
-plt.gca().invert_yaxis()  # Show most important first
-plt.show()
