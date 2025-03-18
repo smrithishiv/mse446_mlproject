@@ -94,13 +94,13 @@ mae = mean_absolute_error(y_test, y_pred)
 mse = mean_squared_error(y_test, y_pred)
 r2 = r2_score(y_test, y_pred)
 
-print(f"📊 Model Performance:")
-print(f"✅ Mean Absolute Error (MAE): {mae:.2f}")
-print(f"✅ Mean Squared Error (MSE): {mse:.2f}")
-print(f"✅ R² Score: {r2:.2f}")
+print(f"Model Performance:")
+print(f"Mean Absolute Error (MAE): {mae:.2f}")
+print(f"Mean Squared Error (MSE): {mse:.2f}")
+print(f"R² Score: {r2:.2f}")
 
 
-# ✅ 1️⃣ Actual vs Predicted Prices
+# Actual vs Predicted Prices
 plt.figure(figsize=(10, 5))
 plt.plot(y_test.values, label="Actual Prices", color="blue")
 plt.plot(y_pred, label="Predicted Prices", color="red", linestyle="dashed")
@@ -110,7 +110,7 @@ plt.title("Actual vs Predicted Stock Prices (XGBoost)")
 plt.legend()
 plt.show()
 
-# ✅ 2️⃣ Residual Distribution (Errors)
+# Residual Distribution (Errors)
 residuals = y_test - y_pred
 plt.figure(figsize=(8, 5))
 sns.histplot(residuals, kde=True, bins=30, color="purple")
@@ -119,7 +119,7 @@ plt.ylabel("Frequency")
 plt.title("Residual Distribution (XGBoost)")
 plt.show()
 
-# ✅ 3️⃣ Feature Importance
+# Feature Importance
 importances = xgb_model.feature_importances_
 feature_names = X_train.columns
 indices = np.argsort(importances)[::-1]

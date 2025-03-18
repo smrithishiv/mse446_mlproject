@@ -57,74 +57,70 @@ if null_counts.empty:
 else:
     print("⚠ Null values still exist:", null_counts)
 
-# Select features (Including election-related ones)
-features = ["Electoral_Vote_Winner", "Popular_Vote_Margin", "Election_Year_Inflation_Rate",
-            "Election_Year_Interest_Rate", "Election_Year_Unemployment_Rate", "Total voted",
-            "Percent voted", "Open", "High", "Low", "Volume"]
+# ✅ **Forcing Election Data by Increasing Feature Importance**
+election_features = ["Electoral_Vote_Winner", "Popular_Vote_Margin", "Election_Year_Inflation_Rate",
+                     "Election_Year_Interest_Rate", "Election_Year_Unemployment_Rate", "Total voted",
+                     "Percent voted"]
+
+# **Increase importance by duplicating election features**
+for feature in election_features:
+    merged_data[f"{feature}_Weighted"] = merged_data[feature] * 10
+
+# **All features (Stock + Election)**
+all_features = election_features + ["Open", "High", "Low", "Volume"]
+
+# **Only Election Features**
+only_election_features = election_features + [f"{feature}_Weighted" for feature in election_features]
 
 # Ensure categorical encoding for political parties
 merged_data = pd.get_dummies(merged_data, columns=["Party", "Opponent_Party"], drop_first=True)
 
 # Feature Scaling (Apply MinMaxScaler to election-related features)
 scaler = MinMaxScaler()
-election_features = ["Electoral_Vote_Winner", "Popular_Vote_Margin", "Election_Year_Inflation_Rate",
-                     "Election_Year_Interest_Rate", "Election_Year_Unemployment_Rate", "Total voted",
-                     "Percent voted"]
-
 merged_data[election_features] = scaler.fit_transform(merged_data[election_features])
 
-# Define input (X) and target variable (y)
-X = merged_data[features]
-y = merged_data["Close"]  # Predicting stock closing price
+# **Train Two Models**
+models = {
+    "Random Forest (All Features)": all_features,
+    "Random Forest (Election-Only)": only_election_features
+}
 
-# Train-Test Split
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+for model_name, selected_features in models.items():
+    print(f"\n🔹 Training {model_name}")
 
-# ✅ Train Random Forest Model
-rf_model = RandomForestRegressor(n_estimators=100, random_state=42)
-rf_model.fit(X_train, y_train)
+    # Define input (X) and target variable (y)
+    X = merged_data[selected_features]
+    y = merged_data["Close"]  # Predicting stock closing price
 
-# Make predictions
-y_pred = rf_model.predict(X_test)
+    # Train-Test Split
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-# Evaluate Model Performance
-mae = mean_absolute_error(y_test, y_pred)
-mse = mean_squared_error(y_test, y_pred)
-r2 = r2_score(y_test, y_pred)
+    # Train Random Forest Model
+    rf_model = RandomForestRegressor(n_estimators=100, max_features="sqrt", random_state=42)  # sqrt forces more feature diversity
+    rf_model.fit(X_train, y_train)
 
-print(f"📊 Random Forest Model Performance:")
-print(f"✅ Mean Absolute Error (MAE): {mae:.2f}")
-print(f"✅ Mean Squared Error (MSE): {mse:.2f}")
-print(f"✅ R² Score: {r2:.2f}")
+    # Make predictions
+    y_pred = rf_model.predict(X_test)
 
-# ✅ 1️⃣ Actual vs Predicted Prices (Line Plot)
-plt.figure(figsize=(10, 5))
-plt.plot(y_test.values, label="Actual Prices", color="blue")
-plt.plot(y_pred, label="Predicted Prices", color="red", linestyle="dashed")
-plt.xlabel("Test Sample Index")
-plt.ylabel("Stock Closing Price")
-plt.title("📈 Actual vs Predicted Stock Prices (Random Forest)")
-plt.legend()
-plt.show()
+    # Evaluate Model Performance
+    mae = mean_absolute_error(y_test, y_pred)
+    mse = mean_squared_error(y_test, y_pred)
+    r2 = r2_score(y_test, y_pred)
 
-# ✅ 2️⃣ Residual Distribution (Errors)
-residuals = y_test - y_pred
-plt.figure(figsize=(8, 5))
-sns.histplot(residuals, kde=True, bins=30, color="purple")
-plt.xlabel("Prediction Error (Residual)")
-plt.ylabel("Frequency")
-plt.title("📊 Residual Distribution (Random Forest)")
-plt.show()
+    print(f"📊 {model_name} Performance:")
+    print(f"✅ Mean Absolute Error (MAE): {mae:.2f}")
+    print(f"✅ Mean Squared Error (MSE): {mse:.2f}")
+    print(f"✅ R² Score: {r2:.2f}")
 
-# ✅ 3️⃣ Feature Importance
-importances = rf_model.feature_importances_
-feature_names = X_train.columns
-indices = np.argsort(importances)[::-1]
+    # ✅ Feature Importance
+    importances = rf_model.feature_importances_
+    feature_names = X_train.columns
+    indices = np.argsort(importances)[::-1]
 
-plt.figure(figsize=(10, 6))
-plt.barh([feature_names[i] for i in indices], importances[indices], color="skyblue")
-plt.xlabel("Importance Score")
-plt.ylabel("Feature")
-plt.title("🔍 Feature Importance in Stock Price Prediction (Random Forest)")
-plt.gca().invert_yaxis()
-plt.show()
+    plt.figure(figsize=(10, 6))
+    plt.barh([feature_names[i] for i in indices], importances[indices], color="skyblue")
+    plt.xlabel("Importance Score")
+    plt.ylabel("Feature")
+    plt.title(f"🔍 Feature Importance ({model_name})")
+    plt.gca().invert_yaxis()
+    plt.show()
