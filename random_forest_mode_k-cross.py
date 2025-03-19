@@ -6,6 +6,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from sklearn.preprocessing import MinMaxScaler
+from sklearn.model_selection import KFold
 
 # Load datasets
 elections = pd.read_csv("data/us_presidential_elections_2000_2024.csv")
@@ -69,52 +70,97 @@ for feature in election_features:
 scaler = MinMaxScaler(feature_range=(0.1, 0.9))  # Ensure election data remains more dominant
 merged_data[election_features] = scaler.fit_transform(merged_data[election_features])
 
-# Define models to compare
-models = {
-    "Random Forest (All Features)": election_features + ["Open", "High", "Low", "Volume"],
-    "Random Forest (Election-Only)": election_features + [f"{feature}_Weighted" for feature in election_features]
-}
+from sklearn.model_selection import KFold
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+from sklearn.preprocessing import MinMaxScaler
+
+# ✅ Define K-Fold Cross Validation
+kf = KFold(n_splits=5, shuffle=True, random_state=42)  # 5-Fold CV
 
 # Store results
 results = {}
 
+# Store predictions for actual vs predicted DataFrame
+all_predictions = []
+
 for model_name, selected_features in models.items():
-    print(f"\n🔹 Training {model_name}")
+    print(f"\n🔹 Training {model_name} with K-Fold Cross Validation")
 
     # Define input (X) and target variable (y)
     X = merged_data[selected_features]
     y = merged_data["Close"]  # Predicting stock closing price
 
-    # Train-Test Split
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-
-    # Train Random Forest Model
+    # Initialize Random Forest model
     rf_model = RandomForestRegressor(n_estimators=100, max_features="sqrt", random_state=42)
-    rf_model.fit(X_train, y_train)
 
-    # Make predictions
-    y_pred = rf_model.predict(X_test)
+    # Lists to store cross-validation scores
+    mae_scores = []
+    mse_scores = []
+    r2_scores = []
+    y_tests = []
+    y_preds = []
 
-    # Evaluate Model Performance
-    mae = mean_absolute_error(y_test, y_pred)
-    mse = mean_squared_error(y_test, y_pred)
-    r2 = r2_score(y_test, y_pred)
+    # Perform K-Fold Cross Validation
+    for train_index, test_index in kf.split(X):
+        X_train, X_test = X.iloc[train_index], X.iloc[test_index]
+        y_train, y_test = y.iloc[train_index], y.iloc[test_index]
 
+        # Train the model
+        rf_model.fit(X_train, y_train)
+
+        # Make predictions
+        y_pred = rf_model.predict(X_test)
+
+        # Store actual and predicted values
+        y_tests.extend(y_test)
+        y_preds.extend(y_pred)
+
+        # Evaluate Model Performance
+        mae_scores.append(mean_absolute_error(y_test, y_pred))
+        mse_scores.append(mean_squared_error(y_test, y_pred))
+        r2_scores.append(r2_score(y_test, y_pred))
+
+    # Store the average cross-validation results
     results[model_name] = {
-        "y_test": y_test,
-        "y_pred": y_pred,
-        "mae": mae,
-        "mse": mse,
-        "r2": r2,
+        "MAE (Mean)": np.mean(mae_scores),
+        "MSE (Mean)": np.mean(mse_scores),
+        "R² Score (Mean)": np.mean(r2_scores),
+        "MAE (Std Dev)": np.std(mae_scores),
+        "MSE (Std Dev)": np.std(mse_scores),
+        "R² Score (Std Dev)": np.std(r2_scores),
         "rf_model": rf_model,
-        "X_train": X_train,
-        "X_test": X_test
+        "features": selected_features,
+        "y_tests": np.array(y_tests),
+        "y_preds": np.array(y_preds),
     }
 
-    print(f"📊 {model_name} Performance:")
-    print(f"✅ Mean Absolute Error (MAE): {mae:.2f}")
-    print(f"✅ Mean Squared Error (MSE): {mse:.2f}")
-    print(f"✅ R² Score: {r2:.2f}")
+    print(f"📊 {model_name} Cross-Validation Performance:")
+    print(f"✅ Mean Absolute Error (MAE): {np.mean(mae_scores):.2f} ± {np.std(mae_scores):.2f}")
+    print(f"✅ Mean Squared Error (MSE): {np.mean(mse_scores):.2f} ± {np.std(mse_scores):.2f}")
+    print(f"✅ R² Score: {np.mean(r2_scores):.2f} ± {np.std(r2_scores):.2f}")
+
+    # Collect actual vs predicted values for DataFrame
+    model_predictions = pd.DataFrame({"Model": model_name, "Actual Price": y_tests, "Predicted Price": y_preds})
+    all_predictions.append(model_predictions)
+
+# ✅ Convert results into a DataFrame for visualization
+results_df = pd.DataFrame.from_dict(results, orient="index")
+
+# ✅ Display the results DataFrame
+import ace_tools as tools
+tools.display_dataframe_to_user(name="K-Fold Cross Validation Results", dataframe=results_df)
+
+# ✅ Create a DataFrame to compare actual vs predicted stock prices for each model
+predictions_df = pd.concat(all_predictions, ignore_index=True)
+
+# ✅ Display Predictions DataFrame
+tools.display_dataframe_to_user(name="Actual vs Predicted Prices", dataframe=predictions_df)
+
 
 # ✅ Graph 1️⃣: Actual vs Predicted Prices
 # plt.figure(figsize=(12, 5))
