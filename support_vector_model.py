@@ -3,7 +3,7 @@ from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.preprocessing import MinMaxScaler, OneHotEncoder
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
-from sklearn.neighbors import KNeighborsRegressor
+from sklearn.svm import SVR
 from sklearn.impute import SimpleImputer
 from sklearn.metrics import mean_squared_error, r2_score
 import numpy as np
@@ -51,25 +51,24 @@ preprocessor = ColumnTransformer(
 # Split the data into training and test sets
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
 
-# Create a pipeline with preprocessing and KNN regressor
+# Create a pipeline with preprocessing and SVR regressor
 pipeline = Pipeline(steps=[
     ('preprocessor', preprocessor),
     ('imputer', SimpleImputer(strategy='mean')),  # Handle missing values
-    ('knn', KNeighborsRegressor())
+    ('svr', SVR())
 ])
 
 # Define the parameter grid for GridSearchCV
 param_grid = {
-    'knn__n_neighbors': [4000,5000],
-    'knn__weights': ['uniform', 'distance'],
-    'knn__metric': ['manhattan'],
-    'knn__p': [1, 2]
+    'svr__C': [0.1, 1, 10],
+    'svr__epsilon': [0.01, 0.1, 1],
+    'svr__kernel': ['rbf', 'linear', 'poly'],
+    'svr__degree': [2, 3]
 }
 
 # Perform GridSearchCV to find the best hyperparameters
 grid_search = GridSearchCV(pipeline, param_grid, cv=5, scoring='neg_mean_squared_error', n_jobs=-1)
 
-# Fit the model
 grid_search.fit(X_train, y_train)
 
 # Get the best parameters
@@ -93,7 +92,7 @@ future_data = pd.DataFrame({
     'Election_Year_Inflation_Rate': [3.0],  # Example inflation rate
     'Election_Year_Interest_Rate': [5.0],   # Example interest rate
     'Election_Year_Unemployment_Rate': [4.5],  # Example unemployment rate
-    'Party': ['D'],  # Example party ('D' for Democrat, 'R' for Republican)
+    'Party': ['R'],  # Example party ('D' for Democrat, 'R' for Republican)
     'Industry_Tag': ['apparel']   # Example industry
 })
 
@@ -102,10 +101,8 @@ future_prediction = grid_search.best_estimator_.predict(future_data)
 
 print(f"Predicted Stock Change Over Presidential Term: ${future_prediction[0]:.2f}")
 
-
-
+# Randomly select 10 actual vs. predicted values for comparison
 random_indices = random.sample(range(len(y_test)), 10) 
-
 comparison_df = pd.DataFrame({
     'Actual': y_test.iloc[random_indices].values,
     'Predicted': y_pred[random_indices]
