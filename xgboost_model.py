@@ -1,11 +1,13 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import seaborn as sns
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.metrics import mean_absolute_error
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from sklearn.preprocessing import MinMaxScaler
 from xgboost import XGBRegressor
+
 
 # Load datasets
 elections = pd.read_csv("data/us_presidential_elections_2000_2024.csv")
@@ -89,9 +91,35 @@ y_pred = xgb_model.predict(X_test)
 
 # Evaluate Model Performance
 mae = mean_absolute_error(y_test, y_pred)
-print(f"Mean Absolute Error (XGBoost): {mae:.2f}")
+mse = mean_squared_error(y_test, y_pred)
+r2 = r2_score(y_test, y_pred)
 
-# Feature Importance (After Scaling)
+print(f"Model Performance:")
+print(f"Mean Absolute Error (MAE): {mae:.2f}")
+print(f"Mean Squared Error (MSE): {mse:.2f}")
+print(f"R² Score: {r2:.2f}")
+
+
+# Actual vs Predicted Prices
+plt.figure(figsize=(10, 5))
+plt.plot(y_test.values, label="Actual Prices", color="blue")
+plt.plot(y_pred, label="Predicted Prices", color="red", linestyle="dashed")
+plt.xlabel("Test Sample Index")
+plt.ylabel("Stock Closing Price")
+plt.title("Actual vs Predicted Stock Prices (XGBoost)")
+plt.legend()
+plt.show()
+
+# Residual Distribution (Errors)
+residuals = y_test - y_pred
+plt.figure(figsize=(8, 5))
+sns.histplot(residuals, kde=True, bins=30, color="purple")
+plt.xlabel("Prediction Error (Residual)")
+plt.ylabel("Frequency")
+plt.title("Residual Distribution (XGBoost)")
+plt.show()
+
+# Feature Importance
 importances = xgb_model.feature_importances_
 feature_names = X_train.columns
 indices = np.argsort(importances)[::-1]
@@ -101,5 +129,5 @@ plt.barh([feature_names[i] for i in indices], importances[indices], color="skybl
 plt.xlabel("Importance Score")
 plt.ylabel("Feature")
 plt.title("Feature Importance in Stock Price Prediction (XGBoost)")
-plt.gca().invert_yaxis()  # Show most important first
+plt.gca().invert_yaxis()
 plt.show()

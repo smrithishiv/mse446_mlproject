@@ -1,102 +1,129 @@
 import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import MinMaxScaler
+from sklearn.model_selection import train_test_split, GridSearchCV
+from sklearn.preprocessing import MinMaxScaler, OneHotEncoder
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
 from sklearn.neighbors import KNeighborsRegressor
-from sklearn.metrics import mean_absolute_error
+from sklearn.impute import SimpleImputer
+from sklearn.metrics import mean_squared_error, r2_score
+import numpy as np
+import random
+import matplotlib.pyplot as plt
 
-# Load datasets
-elections = pd.read_csv("data/us_presidential_elections_2000_2024.csv")
-stocks = pd.read_csv("data/USA_Stock_Prices.csv")
-voters = pd.read_csv("data/voter_demographics_data.csv")
+# Load the merged data
+merged_data = pd.read_csv("data/merged_data.csv")
 
-# Convert dates to datetime format
-elections["Election_Date"] = pd.to_datetime(elections["Election_Date"], errors="coerce", utc=True)
-stocks["Date"] = pd.to_datetime(stocks["Date"], errors="coerce", utc=True)
+# Drop rows with missing essential data
+merged_data = merged_data.dropna(subset=["Close", "Party", "Industry_Tag", 
+                                         "Election_Year_Unemployment_Rate", "Election_Year_Inflation_Rate", 
+                                         "Election_Year_Interest_Rate"])
 
-# Merge stock data with election results (using past election impact)
-merged_data = pd.merge(stocks, elections, left_on="Date", right_on="Election_Date", how="left")
+# Remove outliers based on 3-sigma rule for stock prices
+mean_close = merged_data['Close'].mean()
+std_close = merged_data['Close'].std()
+upper_bound = mean_close + 3 * std_close
+lower_bound = mean_close - 3 * std_close
+cleaned_data = merged_data[(merged_data['Close'] >= lower_bound) & (merged_data['Close'] <= upper_bound)]
 
-# Merge voter demographics on Election Year
-voters["Years"] = pd.to_numeric(voters["Years"], errors="coerce")  # Ensure numeric years
-voters["Years"] = voters["Years"].ffill().astype(int)  # Fix the deprecation warning
-merged_data = pd.merge(merged_data, voters, left_on="Year", right_on="Years", how="left")
+# Compute the average stock price for each industry during each presidential term
+term_avg_prices = cleaned_data.groupby(['Industry_Tag', 'Election_Date']).agg(
+    avg_term_close=('Close', 'mean')
+).reset_index()
 
-# Drop unnecessary columns
-merged_data.drop(columns=["Election_Date", "Inaugration_Date", "End_of_Term", "Years"], inplace=True)
+# Merge back to get pre-election stock price & compute stock change during the term
+cleaned_data = cleaned_data.merge(term_avg_prices, on=['Industry_Tag', 'Election_Date'], how='left')
+cleaned_data['Stock_Change_During_Term'] = cleaned_data['avg_term_close'] - cleaned_data['Close']
 
-# ✅ Remove Non-Numeric Columns Before Filling NaNs
-non_numeric_cols = ["Brand_Name", "Ticker", "Industry_Tag", "Country"]
-merged_data.drop(columns=[col for col in non_numeric_cols if col in merged_data.columns], inplace=True)
+# Define features (X) and target variable (y)
+feature_columns = ['Close', 'Election_Year_Inflation_Rate', 'Election_Year_Interest_Rate', 
+                   'Election_Year_Unemployment_Rate', 'Party', 'Industry_Tag']
+X = cleaned_data[feature_columns]
+y = cleaned_data['Stock_Change_During_Term']  # Target: Stock price change over the term
 
-# ✅ Fill missing values for numerical columns using median
-numeric_cols = merged_data.select_dtypes(include=[np.number]).columns
-merged_data[numeric_cols] = merged_data[numeric_cols].fillna(merged_data[numeric_cols].median())
+# Preprocessing: Scale numeric features & OneHotEncode categorical ones
+preprocessor = ColumnTransformer(
+    transformers=[
+        ('num', MinMaxScaler(), ['Close', 'Election_Year_Unemployment_Rate', 
+                                 'Election_Year_Inflation_Rate', 'Election_Year_Interest_Rate']),
+        ('cat', OneHotEncoder(), ['Party', 'Industry_Tag'])
+    ])
 
-# Select features (Including election-related ones)
-features = ["Electoral_Vote_Winner", "Popular_Vote_Margin", "Election_Year_Inflation_Rate",
-            "Election_Year_Interest_Rate", "Election_Year_Unemployment_Rate", "Total voted",
-            "Percent voted", "Open", "High", "Low", "Volume"]
+# Split the data into training and test sets
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
 
-# Ensure categorical encoding for political parties
-merged_data = pd.get_dummies(merged_data, columns=["Party", "Opponent_Party"], drop_first=True)
+# Create a pipeline with preprocessing and KNN regressor
+pipeline = Pipeline(steps=[
+    ('preprocessor', preprocessor),
+    ('imputer', SimpleImputer(strategy='mean')),  # Handle missing values
+    ('knn', KNeighborsRegressor())
+])
 
-# ✅ Feature Scaling (Apply MinMaxScaler to normalize all features)
-scaler = MinMaxScaler()
-merged_data[features] = scaler.fit_transform(merged_data[features])
+# Define the parameter grid for GridSearchCV
+param_grid = {
+    'knn__n_neighbors': [4000,5000],
+    'knn__weights': ['uniform', 'distance'],
+    'knn__metric': ['manhattan'],
+    'knn__p': [1, 2]
+}
 
-# Define input (X) and target variable (y)
-X = merged_data[features]
-y = merged_data["Close"]  # Predicting stock closing price
+# Perform GridSearchCV to find the best hyperparameters
+grid_search = GridSearchCV(pipeline, param_grid, cv=5, scoring='neg_mean_squared_error', n_jobs=-1)
 
-# ✅ Ensure X has no missing values
-if X.isnull().sum().sum() > 0:
-    print("Warning: X contains NaN values after preprocessing!")
+# Fit the model
+grid_search.fit(X_train, y_train)
 
-# Train-Test Split
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+# Get the best parameters
+print(f"Best Hyperparameters: {grid_search.best_params_}")
 
-# ✅ Ensure X_train and X_test have no NaN values before training
-if X_train.isnull().sum().sum() > 0 or X_test.isnull().sum().sum() > 0:
-    raise ValueError("Error: X_train or X_test still contains NaN values!")
+# Make predictions using the best model
+y_pred = grid_search.best_estimator_.predict(X_test)
 
-# ✅ Train KNN Model
-knn_model = KNeighborsRegressor(n_neighbors=5, weights="distance")  # Weighted by inverse distance
-knn_model.fit(X_train, y_train)
+# Evaluate the model
+mse = mean_squared_error(y_test, y_pred)
+rmse = np.sqrt(mse)
+r2 = r2_score(y_test, y_pred)
 
-# Make predictions
-y_pred = knn_model.predict(X_test)
+print(f"Mean Squared Error (MSE): {mse:.2f}")
+print(f"Root Mean Squared Error (RMSE): {rmse:.2f}")
+print(f"R-squared (R²): {r2:.2f}")
 
-# Evaluate Model Performance
-mae = mean_absolute_error(y_test, y_pred)
-print(f"Mean Absolute Error (KNN): {mae:.2f}")
+# Predict stock change for a future scenario
+future_data = pd.DataFrame({
+    'Close': [150.0],  # Example starting stock price
+    'Election_Year_Inflation_Rate': [3.0],  # Example inflation rate
+    'Election_Year_Interest_Rate': [5.0],   # Example interest rate
+    'Election_Year_Unemployment_Rate': [4.5],  # Example unemployment rate
+    'Party': ['D'],  # Example party ('D' for Democrat, 'R' for Republican)
+    'Industry_Tag': ['apparel']   # Example industry
+})
 
-# ✅ Plot Actual vs Predicted Prices (2020 Onwards)
-X_test["Date"] = merged_data.loc[X_test.index, "Date"]
-X_test_filtered = X_test[X_test["Date"] >= "2020-01-01"]
+# Apply the same transformations to future data
+future_prediction = grid_search.best_estimator_.predict(future_data)
 
-# Sort test set by Date
-X_test_sorted = X_test_filtered.sort_values(by="Date")
-y_test_sorted = y_test.loc[X_test_sorted.index]
-y_pred_sorted = pd.Series(y_pred, index=X_test.index).loc[X_test_sorted.index]
+print(f"Predicted Stock Change Over Presidential Term: ${future_prediction[0]:.2f}")
 
-plt.figure(figsize=(12, 6))
-plt.plot(X_test_sorted["Date"], y_test_sorted, label="Actual Prices", color="blue", alpha=0.6)
-plt.plot(X_test_sorted["Date"], y_pred_sorted, label="Predicted Prices", color="red", linestyle="dashed", alpha=0.3)
-plt.xlabel("Date")
-plt.ylabel("Stock Price (Close)")
-plt.title("Actual vs Predicted Stock Prices (KNN, 2020 Onwards)")
-plt.legend()
+
+
+random_indices = random.sample(range(len(y_test)), 10) 
+
+comparison_df = pd.DataFrame({
+    'Actual': y_test.iloc[random_indices].values,
+    'Predicted': y_pred[random_indices]
+})
+
+print(comparison_df)
+
+# Scatter plot of actual vs. predicted values
+plt.figure(figsize=(8, 6))
+plt.scatter(y_test, y_pred, color='blue', alpha=0.6)
+
+# Add a line for perfect predictions (y = x)
+plt.plot([y_test.min(), y_test.max()], [y_test.min(), y_test.max()], 'r--', lw=2)
+
+# Labels and title
+plt.title('Actual vs. Predicted Stock Change During Presidential Term', fontsize=14)
+plt.xlabel('Actual Stock Change', fontsize=12)
+plt.ylabel('Predicted Stock Change', fontsize=12)
+
+# Show plot
 plt.show()
-
-# ✅ Scatter Plot (Actual vs Predicted)
-plt.figure(figsize=(8, 8))
-plt.scatter(y_test_sorted, y_pred_sorted, alpha=0.6, color="purple")
-plt.xlabel("Actual Stock Price")
-plt.ylabel("Predicted Stock Price")
-plt.title("Actual vs Predicted Stock Prices (KNN)")
-plt.axline((0, 0), slope=1, color="black", linestyle="dashed")  # Perfect prediction line
-plt.show()
-
-print(merged_data.isnull().sum()[merged_data.isnull().sum() > 0])
