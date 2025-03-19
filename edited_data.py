@@ -48,7 +48,7 @@ merged_data = pd.merge(merged_data, voters, how="left", left_on="Year", right_on
 merged_data = merged_data.sort_values(by="Date").ffill()
 
 # Drop unnecessary columns
-columns_to_drop = ["Election_Date", "Inaugration_Date", "End_of_Term", "Election_Year", "Years"]
+columns_to_drop = ["Inaugration_Date", "Election_Year", "Years"]
 merged_data.drop(columns=[col for col in columns_to_drop if col in merged_data.columns], errors="ignore", inplace=True)
 
 # Fix missing 'Capital Gains' by ensuring it’s numeric and filling NaNs
