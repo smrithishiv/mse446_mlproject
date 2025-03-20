@@ -2,132 +2,132 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-from sklearn.model_selection import train_test_split
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
-from sklearn.preprocessing import MinMaxScaler
+import random
+from sklearn.model_selection import train_test_split, GridSearchCV
+from sklearn.preprocessing import MinMaxScaler, OneHotEncoder
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
+from sklearn.impute import SimpleImputer
+from sklearn.metrics import mean_squared_error, r2_score
 from xgboost import XGBRegressor
 
+# ✅ Load the merged data
+merged_data = pd.read_csv("data/merged_data.csv")
 
-# Load datasets
-elections = pd.read_csv("data/us_presidential_elections_2000_2024.csv")
-stocks = pd.read_csv("data/USA_Stock_Prices.csv")
-voters = pd.read_csv("data/voter_demographics_data.csv")
+# ✅ Drop rows with missing essential data
+merged_data = merged_data.dropna(subset=["Close", "Party", "Industry_Tag", 
+                                         "Election_Year_Unemployment_Rate", "Election_Year_Inflation_Rate", 
+                                         "Election_Year_Interest_Rate"])
 
-# Convert dates to datetime format
-elections["Election_Date"] = pd.to_datetime(elections["Election_Date"], errors="coerce", utc=True)
-stocks["Date"] = pd.to_datetime(stocks["Date"], errors="coerce", utc=True)
+# ✅ Remove outliers based on the 3-sigma rule for stock prices
+mean_close = merged_data['Close'].mean()
+std_close = merged_data['Close'].std()
+upper_bound = mean_close + 3 * std_close
+lower_bound = mean_close - 3 * std_close
+cleaned_data = merged_data[(merged_data['Close'] >= lower_bound) & (merged_data['Close'] <= upper_bound)]
 
-# Extract year from stock dates for merging
-stocks["Year"] = stocks["Date"].dt.year
+# ✅ Compute the average stock price for each industry during each presidential term
+term_avg_prices = cleaned_data.groupby(['Industry_Tag', 'Election_Date']).agg(
+    avg_term_close=('Close', 'mean')
+).reset_index()
 
-# Extract election year from election date for merging
-elections["Election_Year"] = elections["Election_Date"].dt.year
+# ✅ Merge back to get pre-election stock price & compute stock change during the term
+cleaned_data = cleaned_data.merge(term_avg_prices, on=['Industry_Tag', 'Election_Date'], how='left')
+cleaned_data['Stock_Change_During_Term'] = cleaned_data['avg_term_close'] - cleaned_data['Close']
 
-# Merge stock data with elections (Forward-fill election data)
-merged_data = pd.merge(stocks, elections, how="left", left_on="Year", right_on="Election_Year")
-merged_data = merged_data.sort_values(by="Date").ffill()  # Forward fill missing election data
+# ✅ Define features (X) and target variable (y)
+feature_columns = ['Close', 'Election_Year_Inflation_Rate', 'Election_Year_Interest_Rate', 
+                   'Election_Year_Unemployment_Rate', 'Party', 'Industry_Tag']
+X = cleaned_data[feature_columns]
+y = cleaned_data['Stock_Change_During_Term']  # Target: Stock price change over the term
 
-# Ensure Year is still in merged_data
-if "Election_Year" in merged_data.columns and "Year" not in merged_data.columns:
-    merged_data.rename(columns={"Election_Year": "Year"}, inplace=True)
+# ✅ Preprocessing: Scale numeric features & OneHotEncode categorical ones
+preprocessor = ColumnTransformer(
+    transformers=[
+        ('num', MinMaxScaler(), ['Close', 'Election_Year_Unemployment_Rate', 
+                                 'Election_Year_Inflation_Rate', 'Election_Year_Interest_Rate']),
+        ('cat', OneHotEncoder(handle_unknown="ignore"), ['Party', 'Industry_Tag'])  # One-hot encode categorical features
+    ]
+)
 
-# Convert voter demographics to numeric (Fix String-to-Float Errors)
-voters["Years"] = pd.to_numeric(voters["Years"], errors="coerce").astype(int)  # Ensure numeric
-for col in voters.columns:
-    if col != "Years":
-        voters[col] = voters[col].astype(str).str.replace(",", "").astype(float)  # Remove commas & convert to float
+# ✅ Split the data into training and test sets
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
 
-# Merge voter data and forward-fill for non-election years
-merged_data = pd.merge(merged_data, voters, how="left", left_on="Year", right_on="Years")
-merged_data = merged_data.sort_values(by="Date").ffill()
+# ✅ Create a pipeline with preprocessing and XGBoost regressor
+pipeline = Pipeline(steps=[
+    ('preprocessor', preprocessor),
+    ('imputer', SimpleImputer(strategy='mean')),  # Handle missing values
+    ('xgb', XGBRegressor(objective='reg:squarederror', random_state=42))
+])
 
-# Drop unnecessary columns
-columns_to_drop = ["Election_Date", "Inaugration_Date", "End_of_Term", "Election_Year", "Years"]
-merged_data.drop(columns=[col for col in columns_to_drop if col in merged_data.columns], errors="ignore", inplace=True)
+# ✅ Define the parameter grid for GridSearchCV
+param_grid = {
+    'xgb__n_estimators': [100, 150],  # Reduce trees (was 100, 150)
+    'xgb__learning_rate': [0.01, 0.03],  # Even lower learning rate
+    'xgb__max_depth': [3, 4],  # Shallower trees
+    'xgb__min_child_weight': [5, 10],  # Prevent small splits
+    'xgb__subsample': [0.7, 0.8],  # Use less data per tree
+    'xgb__colsample_bytree': [0.7, 0.8],  # Reduce feature usage
+    'xgb__reg_lambda': [2.0],  # Stronger L2 regularization
+    'xgb__reg_alpha': [0.5]  # Stronger L1 regularization
+}
 
-# Fix missing 'Capital Gains' by ensuring it’s numeric and filling NaNs
-if "Capital Gains" in merged_data.columns:
-    if merged_data["Capital Gains"].dtype == object:  # Convert string to numeric if necessary
-        merged_data["Capital Gains"] = merged_data["Capital Gains"].astype(str).str.replace(",", "").astype(float)
-    merged_data["Capital Gains"] = merged_data["Capital Gains"].fillna(0)  # Fill missing values with 0
+# ✅ Perform GridSearchCV to find the best hyperparameters
+grid_search = GridSearchCV(pipeline, param_grid, cv=5, scoring='neg_mean_squared_error', n_jobs=-1, verbose=2)
 
-# Final check for null values
-null_counts = merged_data.isnull().sum()[merged_data.isnull().sum() > 0]
-if null_counts.empty:
-    print("No null values remain in merged_data!")
-else:
-    print("Null values still exist:", null_counts)
+# ✅ Fit the model
+grid_search.fit(X_train, y_train)
 
-# Select features (Including election-related ones)
-features = ["Electoral_Vote_Winner", "Popular_Vote_Margin", "Election_Year_Inflation_Rate",
-            "Election_Year_Interest_Rate", "Election_Year_Unemployment_Rate", "Total voted",
-            "Percent voted", "Open", "High", "Low", "Volume"]
+# ✅ Get the best parameters
+print(f"Best Hyperparameters: {grid_search.best_params_}")
 
-# Ensure categorical encoding for political parties
-merged_data = pd.get_dummies(merged_data, columns=["Party", "Opponent_Party"], drop_first=True)
+# ✅ Make predictions using the best model
+y_pred = grid_search.best_estimator_.predict(X_test)
 
-# Feature Scaling (Apply MinMaxScaler to election-related features)
-scaler = MinMaxScaler()
-election_features = ["Electoral_Vote_Winner", "Popular_Vote_Margin", "Election_Year_Inflation_Rate",
-                     "Election_Year_Interest_Rate", "Election_Year_Unemployment_Rate", "Total voted",
-                     "Percent voted"]
-
-merged_data[election_features] = scaler.fit_transform(merged_data[election_features])
-
-# Define input (X) and target variable (y)
-X = merged_data[features]
-y = merged_data["Close"]  # Predicting stock closing price
-
-# Train-Test Split
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-
-# Train XGBoost Model (Better for mixed features)
-xgb_model = XGBRegressor(n_estimators=100, learning_rate=0.1, random_state=42)
-xgb_model.fit(X_train, y_train)
-
-# Make predictions
-y_pred = xgb_model.predict(X_test)
-
-# Evaluate Model Performance
-mae = mean_absolute_error(y_test, y_pred)
+# ✅ Evaluate the model
 mse = mean_squared_error(y_test, y_pred)
+rmse = np.sqrt(mse)
 r2 = r2_score(y_test, y_pred)
 
-print(f"Model Performance:")
-print(f"Mean Absolute Error (MAE): {mae:.2f}")
 print(f"Mean Squared Error (MSE): {mse:.2f}")
-print(f"R² Score: {r2:.2f}")
+print(f"Root Mean Squared Error (RMSE): {rmse:.2f}")
+print(f"R-squared (R²): {r2:.2f}")
 
+# ✅ Predict stock change for a future scenario
+future_data = pd.DataFrame({
+    'Close': [150.0],  # Example starting stock price
+    'Election_Year_Inflation_Rate': [3.0],  # Example inflation rate
+    'Election_Year_Interest_Rate': [5.0],   # Example interest rate
+    'Election_Year_Unemployment_Rate': [4.5],  # Example unemployment rate
+    'Party': ['D'],  # Example party ('D' for Democrat, 'R' for Republican)
+    'Industry_Tag': ['apparel']   # Example industry
+})
 
-# Actual vs Predicted Prices
-plt.figure(figsize=(10, 5))
-plt.plot(y_test.values, label="Actual Prices", color="blue")
-plt.plot(y_pred, label="Predicted Prices", color="red", linestyle="dashed")
-plt.xlabel("Test Sample Index")
-plt.ylabel("Stock Closing Price")
-plt.title("Actual vs Predicted Stock Prices (XGBoost)")
-plt.legend()
-plt.show()
+# ✅ Apply the same transformations to future data
+future_prediction = grid_search.best_estimator_.predict(future_data)
 
-# Residual Distribution (Errors)
-residuals = y_test - y_pred
-plt.figure(figsize=(8, 5))
-sns.histplot(residuals, kde=True, bins=30, color="purple")
-plt.xlabel("Prediction Error (Residual)")
-plt.ylabel("Frequency")
-plt.title("Residual Distribution (XGBoost)")
-plt.show()
+print(f"\n📈 Predicted Stock Change Over Presidential Term: ${future_prediction[0]:.2f}")
 
-# Feature Importance
-importances = xgb_model.feature_importances_
-feature_names = X_train.columns
-indices = np.argsort(importances)[::-1]
+# ✅ Randomly select 10 test samples for comparison
+random_indices = random.sample(range(len(y_test)), 10)
+comparison_df = pd.DataFrame({
+    'Actual': y_test.iloc[random_indices].values,
+    'Predicted': y_pred[random_indices]
+})
+print("\n📊 Random Sample of Actual vs Predicted Values:")
+print(comparison_df)
 
-plt.figure(figsize=(10, 6))
-plt.barh([feature_names[i] for i in indices], importances[indices], color="skyblue")
-plt.xlabel("Importance Score")
-plt.ylabel("Feature")
-plt.title("Feature Importance in Stock Price Prediction (XGBoost)")
-plt.gca().invert_yaxis()
+# ✅ Scatter plot of actual vs. predicted values
+plt.figure(figsize=(8, 6))
+plt.scatter(y_test, y_pred, color='blue', alpha=0.6)
+
+# ✅ Add a line for perfect predictions (y = x)
+plt.plot([y_test.min(), y_test.max()], [y_test.min(), y_test.max()], 'r--', lw=2)
+
+# ✅ Labels and title
+plt.title('Actual vs. Predicted Stock Change During Presidential Term', fontsize=14)
+plt.xlabel('Actual Stock Change', fontsize=12)
+plt.ylabel('Predicted Stock Change', fontsize=12)
+
+# ✅ Show plot
 plt.show()
