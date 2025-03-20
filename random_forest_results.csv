@@ -1,0 +1,4 @@
+MAE (Mean),MSE (Mean),R² Score (Mean),MAE (Std Dev),MSE (Std Dev),R² Score (Std Dev),rf_model,features,y_tests,y_preds
+49.18873150718803,12262.661792404002,0.5059804233873078,1.3826124386536534,894.3580423139146,0.03650416015027222,"RandomForestRegressor(max_features='sqrt', random_state=42)","['Electoral_Vote_Winner', 'Popular_Vote_Margin', 'Election_Year_Inflation_Rate', 'Election_Year_Interest_Rate', 'Election_Year_Unemployment_Rate', 'Total voted', 'Percent voted', 'Open', 'High', 'Low', 'Close', 'Volume']","[-39.06066251 -11.25644684 -19.58116245 ...   0.         781.09002686
+   0.        ]","[-8.01417687e+00 -6.08717585e+00 -9.20858167e+00 ... -1.94900122e-01
+  7.73301711e+02  6.62259842e+00]"

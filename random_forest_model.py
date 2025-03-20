@@ -53,37 +53,30 @@ if "Capital Gains" in merged_data.columns:
 # Final check for null values
 null_counts = merged_data.isnull().sum()[merged_data.isnull().sum() > 0]
 if null_counts.empty:
-    print("✅ No null values remain in merged_data!")
+    print("No null values remain in merged_data!")
 else:
-    print("⚠ Null values still exist:", null_counts)
+    print("Null values still exist:", null_counts)
 
 # ✅ **Forcing Election Data by Increasing Feature Importance**
 election_features = ["Electoral_Vote_Winner", "Popular_Vote_Margin", "Election_Year_Inflation_Rate",
                      "Election_Year_Interest_Rate", "Election_Year_Unemployment_Rate", "Total voted",
                      "Percent voted"]
 
-# **Increase importance by duplicating election features**
+# Duplicate election features to increase importance
 for feature in election_features:
-    merged_data[f"{feature}_Weighted"] = merged_data[feature] * 10
+    merged_data[f"{feature}_Weighted"] = merged_data[feature] * 100
 
-# **All features (Stock + Election)**
-all_features = election_features + ["Open", "High", "Low", "Volume"]
-
-# **Only Election Features**
-only_election_features = election_features + [f"{feature}_Weighted" for feature in election_features]
-
-# Ensure categorical encoding for political parties
-merged_data = pd.get_dummies(merged_data, columns=["Party", "Opponent_Party"], drop_first=True)
-
-# Feature Scaling (Apply MinMaxScaler to election-related features)
-scaler = MinMaxScaler()
+scaler = MinMaxScaler(feature_range=(0.1, 0.9))  # Ensure election data remains more dominant
 merged_data[election_features] = scaler.fit_transform(merged_data[election_features])
 
-# **Train Two Models**
+# Define models to compare
 models = {
-    "Random Forest (All Features)": all_features,
-    "Random Forest (Election-Only)": only_election_features
+    "Random Forest (All Features)": election_features + ["Open", "High", "Low", "Volume"],
+    "Random Forest (Election-Only)": election_features + [f"{feature}_Weighted" for feature in election_features]
 }
+
+# Store results
+results = {}
 
 for model_name, selected_features in models.items():
     print(f"\n🔹 Training {model_name}")
@@ -96,7 +89,7 @@ for model_name, selected_features in models.items():
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
     # Train Random Forest Model
-    rf_model = RandomForestRegressor(n_estimators=100, max_features="sqrt", random_state=42)  # sqrt forces more feature diversity
+    rf_model = RandomForestRegressor(n_estimators=100, max_features="sqrt", random_state=42)
     rf_model.fit(X_train, y_train)
 
     # Make predictions
@@ -107,20 +100,101 @@ for model_name, selected_features in models.items():
     mse = mean_squared_error(y_test, y_pred)
     r2 = r2_score(y_test, y_pred)
 
+    results[model_name] = {
+        "y_test": y_test,
+        "y_pred": y_pred,
+        "mae": mae,
+        "mse": mse,
+        "r2": r2,
+        "rf_model": rf_model,
+        "X_train": X_train,
+        "X_test": X_test
+    }
+
     print(f"📊 {model_name} Performance:")
     print(f"✅ Mean Absolute Error (MAE): {mae:.2f}")
     print(f"✅ Mean Squared Error (MSE): {mse:.2f}")
     print(f"✅ R² Score: {r2:.2f}")
 
-    # ✅ Feature Importance
-    importances = rf_model.feature_importances_
-    feature_names = X_train.columns
-    indices = np.argsort(importances)[::-1]
+# ✅ Graph 1️⃣: Actual vs Predicted Prices
+# plt.figure(figsize=(12, 5))
 
-    plt.figure(figsize=(10, 6))
-    plt.barh([feature_names[i] for i in indices], importances[indices], color="skyblue")
-    plt.xlabel("Importance Score")
-    plt.ylabel("Feature")
-    plt.title(f"🔍 Feature Importance ({model_name})")
-    plt.gca().invert_yaxis()
-    plt.show()
+# for i, (model_name, data) in enumerate(results.items()):
+#     plt.subplot(1, 2, i+1)
+#     plt.plot(data["y_test"].values, label="Actual Prices", color="blue", alpha=0.6)
+#     plt.plot(data["y_pred"], label="Predicted Prices", color="red", linestyle="dashed", alpha=0.7)
+#     plt.xlabel("Test Sample Index")
+#     plt.ylabel("Stock Closing Price")
+#     plt.title(f"📈 Actual vs Predicted ({model_name})")
+#     plt.legend()
+
+# plt.tight_layout()
+# plt.show()
+
+# # ✅ Graph 2️⃣: Residual Distribution (Errors)
+# plt.figure(figsize=(12, 5))
+
+# for i, (model_name, data) in enumerate(results.items()):
+#     residuals = data["y_test"] - data["y_pred"]
+#     plt.subplot(1, 2, i+1)
+#     sns.histplot(residuals, kde=True, bins=30, color="purple")
+#     plt.xlabel("Prediction Error (Residual)")
+#     plt.ylabel("Frequency")
+#     plt.title(f"📊 Residual Distribution ({model_name})")
+
+# plt.tight_layout()
+# plt.show()
+
+# # ✅ Graph 3️⃣: Feature Importance
+# plt.figure(figsize=(12, 5))
+
+# for i, (model_name, data) in enumerate(results.items()):
+#     importances = data["rf_model"].feature_importances_
+#     feature_names = data["X_train"].columns
+#     indices = np.argsort(importances)[::-1]
+
+#     plt.subplot(1, 2, i+1)
+#     plt.barh([feature_names[i] for i in indices], importances[indices], color="skyblue")
+#     plt.xlabel("Importance Score")
+#     plt.ylabel("Feature")
+#     plt.title(f"🔍 Feature Importance ({model_name})")
+#     plt.gca().invert_yaxis()
+
+# plt.tight_layout()
+# plt.show()
+
+# ✅ Convert results dictionary into a DataFrame for better visualization
+results_df = pd.DataFrame([
+    {
+        "Model": model_name,
+        "Mean Absolute Error (MAE)": data["mae"],
+        "Mean Squared Error (MSE)": data["mse"],
+        "R² Score": data["r2"]
+    }
+    for model_name, data in results.items()
+])
+
+# ✅ Create a DataFrame to compare actual vs predicted stock prices for each model
+predictions_df_list = []
+
+for model_name, data in results.items():
+    comparison_df = pd.DataFrame({
+        "Model": model_name,
+        "Actual Price": data["y_test"].values,
+        "Predicted Price": data["y_pred"]
+    })
+    predictions_df_list.append(comparison_df)
+
+# Combine results from all models into a single DataFrame
+predictions_df = pd.concat(predictions_df_list, ignore_index=True)
+
+# ✅ Display DataFrames
+print("\n📊 Model Performance Metrics:")
+print(results_df)
+
+print("\n📈 Predicted vs. Actual Stock Prices:")
+print(predictions_df)
+
+# ✅ (Optional) Save DataFrames to CSV for future analysis
+results_df.to_csv("random_forest_results.csv", index=False)
+predictions_df.to_csv("predicted_vs_actual_stock_prices.csv", index=False)
