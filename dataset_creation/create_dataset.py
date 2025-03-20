@@ -60,8 +60,8 @@ if "Capital Gains" in merged_data.columns:
 # Final check for null values
 null_counts = merged_data.isnull().sum()[merged_data.isnull().sum() > 0]
 if null_counts.empty:
-    print("No null values remain in merged_data!")
+    print("No null values remain in merged_data")
 else:
-    print("⚠Null values still exist:", null_counts)
+    print("Null values still exist:", null_counts)
 
 merged_data.to_csv("data/merged_data.csv", index=False)
