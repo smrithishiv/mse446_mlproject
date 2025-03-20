@@ -196,5 +196,5 @@ print("\n Predicted vs. Actual Stock Prices:")
 print(predictions_df)
 
 # (Optional) Save DataFrames to CSV for future analysis
-results_df.to_csv("random_forest_results.csv", index=False)
-predictions_df.to_csv("predicted_vs_actual_stock_prices.csv", index=False)
+results_df.to_csv("random_forest/random_forest_results.csv", index=False)
+predictions_df.to_csv("random_forest/predicted_vs_actual_stock_prices.csv", index=False)
