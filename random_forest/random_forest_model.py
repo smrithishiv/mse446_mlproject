@@ -57,7 +57,7 @@ if null_counts.empty:
 else:
     print("Null values still exist:", null_counts)
 
-# ✅ **Forcing Election Data by Increasing Feature Importance**
+# Forcing Election Data by Increasing Feature Importance
 election_features = ["Electoral_Vote_Winner", "Popular_Vote_Margin", "Election_Year_Inflation_Rate",
                      "Election_Year_Interest_Rate", "Election_Year_Unemployment_Rate", "Total voted",
                      "Percent voted"]
@@ -79,7 +79,7 @@ models = {
 results = {}
 
 for model_name, selected_features in models.items():
-    print(f"\n🔹 Training {model_name}")
+    print(f"\n Training {model_name}")
 
     # Define input (X) and target variable (y)
     X = merged_data[selected_features]
@@ -111,12 +111,12 @@ for model_name, selected_features in models.items():
         "X_test": X_test
     }
 
-    print(f"📊 {model_name} Performance:")
-    print(f"✅ Mean Absolute Error (MAE): {mae:.2f}")
-    print(f"✅ Mean Squared Error (MSE): {mse:.2f}")
-    print(f"✅ R² Score: {r2:.2f}")
+    print(f" {model_name} Performance:")
+    print(f" Mean Absolute Error (MAE): {mae:.2f}")
+    print(f" Mean Squared Error (MSE): {mse:.2f}")
+    print(f" R² Score: {r2:.2f}")
 
-# ✅ Graph 1️⃣: Actual vs Predicted Prices
+# Graph 1: Actual vs Predicted Prices
 # plt.figure(figsize=(12, 5))
 
 # for i, (model_name, data) in enumerate(results.items()):
@@ -125,13 +125,13 @@ for model_name, selected_features in models.items():
 #     plt.plot(data["y_pred"], label="Predicted Prices", color="red", linestyle="dashed", alpha=0.7)
 #     plt.xlabel("Test Sample Index")
 #     plt.ylabel("Stock Closing Price")
-#     plt.title(f"📈 Actual vs Predicted ({model_name})")
+#     plt.title(f" Actual vs Predicted ({model_name})")
 #     plt.legend()
 
 # plt.tight_layout()
 # plt.show()
 
-# # ✅ Graph 2️⃣: Residual Distribution (Errors)
+# # Graph 2: Residual Distribution (Errors)
 # plt.figure(figsize=(12, 5))
 
 # for i, (model_name, data) in enumerate(results.items()):
@@ -140,12 +140,12 @@ for model_name, selected_features in models.items():
 #     sns.histplot(residuals, kde=True, bins=30, color="purple")
 #     plt.xlabel("Prediction Error (Residual)")
 #     plt.ylabel("Frequency")
-#     plt.title(f"📊 Residual Distribution ({model_name})")
+#     plt.title(f" Residual Distribution ({model_name})")
 
 # plt.tight_layout()
 # plt.show()
 
-# # ✅ Graph 3️⃣: Feature Importance
+# # Graph 3: Feature Importance
 # plt.figure(figsize=(12, 5))
 
 # for i, (model_name, data) in enumerate(results.items()):
@@ -157,13 +157,13 @@ for model_name, selected_features in models.items():
 #     plt.barh([feature_names[i] for i in indices], importances[indices], color="skyblue")
 #     plt.xlabel("Importance Score")
 #     plt.ylabel("Feature")
-#     plt.title(f"🔍 Feature Importance ({model_name})")
+#     plt.title(f" Feature Importance ({model_name})")
 #     plt.gca().invert_yaxis()
 
 # plt.tight_layout()
 # plt.show()
 
-# ✅ Convert results dictionary into a DataFrame for better visualization
+# Convert results dictionary into a DataFrame for better visualization
 results_df = pd.DataFrame([
     {
         "Model": model_name,
@@ -174,7 +174,7 @@ results_df = pd.DataFrame([
     for model_name, data in results.items()
 ])
 
-# ✅ Create a DataFrame to compare actual vs predicted stock prices for each model
+# Create a DataFrame to compare actual vs predicted stock prices for each model
 predictions_df_list = []
 
 for model_name, data in results.items():
@@ -188,13 +188,13 @@ for model_name, data in results.items():
 # Combine results from all models into a single DataFrame
 predictions_df = pd.concat(predictions_df_list, ignore_index=True)
 
-# ✅ Display DataFrames
-print("\n📊 Model Performance Metrics:")
+# Display DataFrames
+print("\n Model Performance Metrics:")
 print(results_df)
 
-print("\n📈 Predicted vs. Actual Stock Prices:")
+print("\n Predicted vs. Actual Stock Prices:")
 print(predictions_df)
 
-# ✅ (Optional) Save DataFrames to CSV for future analysis
-results_df.to_csv("random_forest_results.csv", index=False)
-predictions_df.to_csv("predicted_vs_actual_stock_prices.csv", index=False)
+# (Optional) Save DataFrames to CSV for future analysis
+results_df.to_csv("random_forest/random_forest_results.csv", index=False)
+predictions_df.to_csv("random_forest/predicted_vs_actual_stock_prices.csv", index=False)

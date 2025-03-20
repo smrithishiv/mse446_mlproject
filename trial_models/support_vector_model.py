@@ -38,7 +38,7 @@ cleaned_data['Stock_Change_During_Term'] = cleaned_data['avg_term_close'] - clea
 feature_columns = ['Close', 'Election_Year_Inflation_Rate', 'Election_Year_Interest_Rate', 
                    'Election_Year_Unemployment_Rate', 'Party', 'Industry_Tag']
 X = cleaned_data[feature_columns]
-y = cleaned_data['Stock_Change_During_Term']  # Target: Stock price change over the term
+y = cleaned_data['Stock_Change_During_Term'] 
 
 # Preprocessing: Scale numeric features & OneHotEncode categorical ones
 preprocessor = ColumnTransformer(
@@ -54,7 +54,7 @@ X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_
 # Create a pipeline with preprocessing and SVR regressor
 pipeline = Pipeline(steps=[
     ('preprocessor', preprocessor),
-    ('imputer', SimpleImputer(strategy='mean')),  # Handle missing values
+    ('imputer', SimpleImputer(strategy='mean')),
     ('svr', SVR())
 ])
 
@@ -88,12 +88,12 @@ print(f"R-squared (R²): {r2:.2f}")
 
 # Predict stock change for a future scenario
 future_data = pd.DataFrame({
-    'Close': [150.0],  # Example starting stock price
-    'Election_Year_Inflation_Rate': [3.0],  # Example inflation rate
-    'Election_Year_Interest_Rate': [5.0],   # Example interest rate
-    'Election_Year_Unemployment_Rate': [4.5],  # Example unemployment rate
-    'Party': ['R'],  # Example party ('D' for Democrat, 'R' for Republican)
-    'Industry_Tag': ['apparel']   # Example industry
+    'Close': [150.0], 
+    'Election_Year_Inflation_Rate': [3.0], 
+    'Election_Year_Interest_Rate': [5.0],
+    'Election_Year_Unemployment_Rate': [4.5], 
+    'Party': ['R'],
+    'Industry_Tag': ['apparel'] 
 })
 
 # Apply the same transformations to future data

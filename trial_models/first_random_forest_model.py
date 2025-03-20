@@ -1,5 +1,8 @@
 import pandas as pd
 import numpy as np
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import mean_absolute_error
 
 # Load datasets
 elections = pd.read_csv("data/us_presidential_elections_2000_2024.csv")
@@ -23,10 +26,6 @@ merged_data.drop(columns=["Election_Date", "Inaugration_Date", "End_of_Term", "Y
 # Fill missing values
 merged_data.fillna(method="ffill", inplace=True)
 
-
-from sklearn.model_selection import train_test_split
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.metrics import mean_absolute_error
 
 # Select features
 features = ["Electoral_Vote_Winner", "Popular_Vote_Margin", "Election_Year_Inflation_Rate",

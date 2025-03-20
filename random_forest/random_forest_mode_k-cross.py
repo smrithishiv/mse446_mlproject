@@ -1,14 +1,15 @@
 import pandas as pd
-from sklearn.model_selection import train_test_split, GridSearchCV
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+import random
+from sklearn.model_selection import train_test_split, KFold, cross_val_score
+from sklearn.ensemble import RandomForestRegressor
 from sklearn.preprocessing import MinMaxScaler, OneHotEncoder
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
-from sklearn.neighbors import KNeighborsRegressor
 from sklearn.impute import SimpleImputer
 from sklearn.metrics import mean_squared_error, r2_score
-import numpy as np
-import random
-import matplotlib.pyplot as plt
 
 # Load the merged data
 merged_data = pd.read_csv("data/merged_data.csv")
@@ -18,7 +19,7 @@ merged_data = merged_data.dropna(subset=["Close", "Party", "Industry_Tag",
                                          "Election_Year_Unemployment_Rate", "Election_Year_Inflation_Rate", 
                                          "Election_Year_Interest_Rate"])
 
-# Remove outliers based on 3-sigma rule for stock prices
+# Remove outliers based on the 3-sigma rule for stock prices
 mean_close = merged_data['Close'].mean()
 std_close = merged_data['Close'].std()
 upper_bound = mean_close + 3 * std_close
@@ -51,41 +52,34 @@ preprocessor = ColumnTransformer(
 # Split the data into training and test sets
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
 
-# Create a pipeline with preprocessing and KNN regressor
+# Create a pipeline with preprocessing and RandomForestRegressor
 pipeline = Pipeline(steps=[
     ('preprocessor', preprocessor),
     ('imputer', SimpleImputer(strategy='mean')),  # Handle missing values
-    ('knn', KNeighborsRegressor())
+    ('rf', RandomForestRegressor(n_estimators=100, max_depth=10, random_state=42))
 ])
 
-# Define the parameter grid for GridSearchCV
-param_grid = {
-    'knn__n_neighbors': [4000,5000],
-    'knn__weights': ['uniform', 'distance'],
-    'knn__metric': ['manhattan'],
-    'knn__p': [1, 2]
-}
+# K-Fold Cross Validation (k=3)
+kf = KFold(n_splits=3, shuffle=True, random_state=42)
+cross_val_scores = cross_val_score(pipeline, X_train, y_train, cv=kf, scoring="r2")
 
-# Perform GridSearchCV to find the best hyperparameters
-grid_search = GridSearchCV(pipeline, param_grid, cv=5, scoring='neg_mean_squared_error', n_jobs=-1)
+# Train the model
+pipeline.fit(X_train, y_train)
 
-# Fit the model
-grid_search.fit(X_train, y_train)
-
-# Get the best parameters
-print(f"Best Hyperparameters: {grid_search.best_params_}")
-
-# Make predictions using the best model
-y_pred = grid_search.best_estimator_.predict(X_test)
+# Make predictions using the trained model
+y_pred = pipeline.predict(X_test)
 
 # Evaluate the model
 mse = mean_squared_error(y_test, y_pred)
 rmse = np.sqrt(mse)
 r2 = r2_score(y_test, y_pred)
 
-print(f"Mean Squared Error (MSE): {mse:.2f}")
-print(f"Root Mean Squared Error (RMSE): {rmse:.2f}")
-print(f"R-squared (R²): {r2:.2f}")
+print(f"K-Fold Cross Validation Results (k=3):")
+print(f"Mean R²: {np.mean(cross_val_scores):.3f} ± {np.std(cross_val_scores):.3f}")
+print("\n Final Random Forest Model Performance:")
+print(f" Mean Squared Error (MSE): {mse:.2f}")
+print(f" Root Mean Squared Error (RMSE): {rmse:.2f}")
+print(f" R² Score: {r2:.2f}")
 
 # Predict stock change for a future scenario
 future_data = pd.DataFrame({
@@ -93,24 +87,22 @@ future_data = pd.DataFrame({
     'Election_Year_Inflation_Rate': [3.0],  # Example inflation rate
     'Election_Year_Interest_Rate': [5.0],   # Example interest rate
     'Election_Year_Unemployment_Rate': [4.5],  # Example unemployment rate
-    'Party': ['D'],  # Example party ('D' for Democrat, 'R' for Republican)
+    'Party': ['R'],  # Example party ('D' for Democrat, 'R' for Republican)
     'Industry_Tag': ['apparel']   # Example industry
 })
 
 # Apply the same transformations to future data
-future_prediction = grid_search.best_estimator_.predict(future_data)
+future_prediction = pipeline.predict(future_data)
 
-print(f"Predicted Stock Change Over Presidential Term: ${future_prediction[0]:.2f}")
+print(f"\n Predicted Stock Change Over Presidential Term: ${future_prediction[0]:.2f}")
 
-
-
-random_indices = random.sample(range(len(y_test)), 10) 
-
+# Randomly select 10 test samples for comparison
+random_indices = random.sample(range(len(y_test)), 10)
 comparison_df = pd.DataFrame({
     'Actual': y_test.iloc[random_indices].values,
     'Predicted': y_pred[random_indices]
 })
-
+print("\n Random Sample of Actual vs Predicted Values:")
 print(comparison_df)
 
 # Scatter plot of actual vs. predicted values

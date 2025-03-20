@@ -12,8 +12,6 @@ stock_df['Date'] = pd.to_datetime(stock_df['Date'], errors='coerce', utc=True)
 stock_df['Year'] = stock_df['Date'].dt.year
 
 ## Scatter Plot with Regression: Popular vote margin vs. stock market reaction 
-
-
 if 'Year' not in election_df.columns:
     election_df['Election_Date'] = pd.to_datetime(election_df['Election_Date'])
     election_df['Year'] = election_df['Election_Date'].dt.year
