@@ -6,6 +6,7 @@ from sklearn.compose import ColumnTransformer
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
 from yellowbrick.cluster import KElbowVisualizer
+import random
 
 # Load the merged dataset
 merged_data = pd.read_csv("data/merged_data.csv")
@@ -32,7 +33,7 @@ preprocessor = ColumnTransformer(
     transformers=[
         ('num', MinMaxScaler(), ['Close', 'Election_Year_Unemployment_Rate', 
                                  'Election_Year_Inflation_Rate', 'Election_Year_Interest_Rate']),
-        ('cat', OneHotEncoder(sparse_output=False), ['Party', 'Industry_Tag'])  # ✅ Keep this
+        ('cat', OneHotEncoder(sparse_output=False), ['Party', 'Industry_Tag'])
     ]
 )
 
@@ -41,7 +42,7 @@ X_processed = preprocessor.fit_transform(X)
 
 # Determine Optimal Clusters Using Elbow Method
 model = KMeans(init="k-means++", random_state=42)
-visualizer = KElbowVisualizer(model, k=(2, 10))  # Testing 2 to 10 clusters
+visualizer = KElbowVisualizer(model, k=(2, 10)) 
 visualizer.fit(X_processed)  
 visualizer.show()
 
@@ -86,7 +87,7 @@ cluster_stock_change = cleaned_data.groupby("Cluster")["Stock_Change_During_Term
 cleaned_data["Predicted_Stock_Change"] = cleaned_data["Cluster"].map(cluster_stock_change)
 
 # Select Random Data Points for Comparison
-random_indices = random.sample(range(len(cleaned_data)), min(300, len(cleaned_data)))  # Select up to 300 points
+random_indices = random.sample(range(len(cleaned_data)), min(300, len(cleaned_data)))
 
 comparison_df = pd.DataFrame({
     'Actual': cleaned_data.iloc[random_indices]["Stock_Change_During_Term"].values,
@@ -110,4 +111,3 @@ plt.ylabel('Predicted Stock Change (Cluster Mean)', fontsize=12)
 
 # Show plot
 plt.show()
-
