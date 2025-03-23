@@ -77,7 +77,7 @@ print(cleaned_data["Cluster"].value_counts())
 
 # Show Average Stock Prices by Cluster
 cluster_analysis = cleaned_data.groupby("Cluster")["Close"].mean()
-print("\n💰 Average Stock Prices by Cluster:")
+print("\n Average Stock Prices by Cluster:")
 print(cluster_analysis)
 
 # Compute Average Stock Change for Each Cluster
